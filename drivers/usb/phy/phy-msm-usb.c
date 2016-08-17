@@ -120,6 +120,16 @@ static struct power_supply *psy;
 
 static bool aca_id_turned_on;
 static bool legacy_power_supply;
+
+
+//+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+#if defined (WT_USE_FAN54015)    
+
+extern  bool IsUsbPlugIn,IsTAPlugIn,TrunOnChg,OTGturnOn,VbusValid;
+extern struct work_struct chg_fast_work;
+
+#endif
+//-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
 static inline bool aca_enabled(void)
 {
 #ifdef CONFIG_USB_MSM_ACA
@@ -1260,6 +1270,14 @@ static irqreturn_t msm_otg_phy_irq_handler(int irq, void *data)
 		msm_id_status_w(&motg->id_status_work.work);
 	}
 
+  //+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+#if defined (WT_USE_FAN54015)    
+          printk(KERN_WARNING   "~OTG IRQ \n");
+         OTGturnOn = true;    
+
+#endif
+//-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+
 	return IRQ_HANDLED;
 }
 
@@ -1901,6 +1919,7 @@ static int msm_otg_notify_power_supply(struct msm_otg *motg, unsigned mA)
 			goto psy_error;
 	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2)) {
 		/* Disable charging */
+    	   
 		if (power_supply_set_online(psy, false))
 			goto psy_error;
 		/* Set max current limit in uA */
@@ -1928,6 +1947,7 @@ static void msm_otg_set_online_status(struct msm_otg *motg)
 		dev_dbg(motg->phy.dev, "no usb power supply registered\n");
 		return;
 	}
+
 
 	/* Set power supply online status to false */
 	if (power_supply_set_online(psy, false))
@@ -1989,8 +2009,22 @@ static int msm_otg_set_power(struct usb_phy *phy, unsigned mA)
 	 * states when CDP/ACA is connected.
 	 */
 	if (motg->chg_type == USB_SDP_CHARGER)
+	 //+NewFeature,mahao.wt,ADD,2015.5.28,charging stop suddenly when select between  dropdown  USB fuction menu items
+	  #if defined (WT_USE_FAN54015)  
+	  {//it is USB HOST charger,during USB function switch,if VBUS valid then DO NOT turn off charging
+	       if(VbusValid&&(mA == 0 || mA == 2))
+		      mA = 10; 	
+	  #endif	   
+        //-NewFeature,mahao.wt,ADD,2015.5.28,charging stop suddenly when select between  dropdown  USB fuction menu items		 
+		 
 		msm_otg_notify_charger(motg, mA);
 
+        //+NewFeature,mahao.wt,ADD,2015.5.28,charging stop suddenly when select between  dropdown  USB fuction menu items
+	  #if defined (WT_USE_FAN54015)  
+	  } 
+          #endif	   
+        //-NewFeature,mahao.wt,ADD,2015.5.28,charging stop suddenly when select between  dropdown  USB fuction menu items	
+        
 	return 0;
 }
 
@@ -3276,6 +3310,27 @@ static void msm_otg_sm_work(struct work_struct *w)
 				msm_chg_detect_work(&motg->chg_work.work);
 				break;
 			case USB_CHG_STATE_DETECTED:
+
+                              //+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+                                  #if defined (WT_USE_FAN54015)    
+                                       if((motg->chg_type==USB_DCP_CHARGER)&&(!OTGturnOn))
+					    { printk(KERN_WARNING   "~TA Plug In.  \n");
+					      IsTAPlugIn=true;
+					      IsUsbPlugIn=false;
+				              TrunOnChg=true;		  
+					       schedule_work(&chg_fast_work);
+                                       	    }
+				       else  if((motg->chg_type==USB_SDP_CHARGER)&&(!OTGturnOn))					   
+                                                    {  printk(KERN_WARNING   "~USB Plug In.  \n");
+                                                       IsUsbPlugIn=true;
+						       IsTAPlugIn=false;							   
+						       TrunOnChg=true;
+						        schedule_work(&chg_fast_work);	   
+				       	            }
+
+                                 #endif
+                              //-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+                              
 				switch (motg->chg_type) {
 				case USB_DCP_CHARGER:
 					/* fall through */

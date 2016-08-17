@@ -508,6 +508,7 @@ static void bulk_out_complete(struct usb_ep *ep, struct usb_request *req)
 	spin_unlock(&common->lock);
 }
 
+extern int luns_count;//shenyong.wt,20140912,add mtp+cdrom
 static int fsg_setup(struct usb_function *f,
 		     const struct usb_ctrlrequest *ctrl)
 {
@@ -554,8 +555,14 @@ static int fsg_setup(struct usb_function *f,
 				w_length != 1)
 			return -EDOM;
 		VDBG(fsg, "get max LUN\n");
-		*(u8 *)req->buf = fsg->common->nluns - 1;
+		//shenyong.wt,20140912,start.add mtp+cdrom
+		//printk("XXX::common->nluns=%d, luns_count=%d\r\n",fsg->common->nluns, luns_count);//hoper		
+		*(u8 *)req->buf = luns_count - 2;
+		//shenyong.wt,20140912,end.add mtp+cdrom
 
+		//+++Require,HuangNan_Wingtech,remove internal sd card
+		//*(u8 *)req->buf = fsg->common->nluns - 2;
+        //---Require,HuangNan_Wingtech,remove internal sd card
 		/* Respond with data/status */
 		req->length = min((u16)1, w_length);
 		return ep0_queue(fsg->common);

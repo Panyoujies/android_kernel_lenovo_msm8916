@@ -51,6 +51,9 @@
 
 #define NUM_DECIMATORS	4
 #define MSM89XX_VDD_SPKDRV_NAME "cdc-vdd-spkdrv"
+#define EXT_SPK_AMP_GPIO    (902+119)
+//#define EXT_SPK_AMP_GPIO_1    (902+117)
+#define EXT_SPK_AMP_HEADSET_GPIO    (902+120)
 
 #define DEFAULT_MULTIPLIER 800
 #define DEFAULT_GAIN 9

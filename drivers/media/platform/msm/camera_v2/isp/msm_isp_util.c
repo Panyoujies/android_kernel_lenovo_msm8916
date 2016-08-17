@@ -182,6 +182,11 @@ int msm_isp_update_bandwidth(enum msm_isp_hw_client client,
 				isp_bandwidth_mgr.client_info[i].ib;
 		}
 	}
+
+  if(path->vectors[0].ib <6400000000) {   
+        path->vectors[0].ib = 6400000000;    
+  }        
+
 	ISP_DBG("%s: Total AB = %llu IB = %llu\n", __func__,
 			path->vectors[0].ab, path->vectors[0].ib);
 	msm_bus_scale_client_update_request(isp_bandwidth_mgr.bus_client,

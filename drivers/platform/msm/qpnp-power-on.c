@@ -1473,6 +1473,13 @@ static void qpnp_pon_debugfs_remove(struct spmi_device *spmi)
 {}
 #endif
 
+//+NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll
+ #ifdef  WT_USE_FAN54015 
+bool PwrKeyBoot = false;      
+#endif
+//-NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll
+
+
 static int qpnp_pon_probe(struct spmi_device *spmi)
 {
 	struct qpnp_pon *pon;
@@ -1542,6 +1549,18 @@ static int qpnp_pon_probe(struct spmi_device *spmi)
 	boot_reason = ffs(pon_sts);
 
 	index = ffs(pon_sts) - 1;
+
+ //+NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll
+   #ifdef  WT_USE_FAN54015		
+			
+      if(index!=4) // if boot mode != chareger boot mode,then apply dynamic charger current
+	 {
+         	  printk(KERN_WARNING  "~PON:%s\n",qpnp_pon_reason[index]); 	   
+		  PwrKeyBoot = true; 
+         }
+ #endif
+ //-NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll
+	
 	cold_boot = !qpnp_pon_is_warm_reset();
 	if (index >= ARRAY_SIZE(qpnp_pon_reason) || index < 0) {
 		dev_info(&pon->spmi->dev,

@@ -17,6 +17,8 @@
 #include "msm_camera_i2c_mux.h"
 #include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/regulator/consumer.h>
+#include <linux/hardware_info.h>
+
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
@@ -409,12 +411,22 @@ static struct msm_cam_clk_info cam_8974_clk_info[] = {
 	[SENSOR_CAM_MCLK] = {"cam_src_clk", 24000000},
 	[SENSOR_CAM_CLK] = {"cam_clk", 0},
 };
-
+#ifdef CONFIG_DISPSENSOR_CAMERA_OPEN
+void (*msm_sensor_power_on)(int power_up) = NULL ;
+EXPORT_SYMBOL_GPL(msm_sensor_power_on);
+#endif
 int msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 {
 	struct msm_camera_power_ctrl_t *power_info;
 	enum msm_camera_device_type_t sensor_device_type;
 	struct msm_camera_i2c_client *sensor_i2c_client;
+
+#ifdef CONFIG_DISPSENSOR_CAMERA_OPEN
+	if(msm_sensor_power_on != NULL)
+	{
+		msm_sensor_power_on(0);
+	}
+#endif
 
 	if (!s_ctrl) {
 		pr_err("%s:%d failed: s_ctrl %p\n",
@@ -449,12 +461,11 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 			__func__, __LINE__, s_ctrl);
 		return -EINVAL;
 	}
-
+	
 	power_info = &s_ctrl->sensordata->power_info;
 	sensor_i2c_client = s_ctrl->sensor_i2c_client;
 	slave_info = s_ctrl->sensordata->slave_info;
 	sensor_name = s_ctrl->sensordata->sensor_name;
-
 	if (!power_info || !sensor_i2c_client || !slave_info ||
 		!sensor_name) {
 		pr_err("%s:%d failed: %p %p %p %p\n",
@@ -481,6 +492,15 @@ int msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 			break;
 		}
 	}
+#ifdef CONFIG_DISPSENSOR_CAMERA_OPEN
+	if(rc == 0)
+	{
+		if(msm_sensor_power_on != NULL)
+		{
+			msm_sensor_power_on(1);
+		}
+	}
+#endif
 
 	return rc;
 }
@@ -522,6 +542,13 @@ int msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 	if (chipid != slave_info->sensor_id) {
 		pr_err("msm_sensor_match_id chip id doesnot match\n");
 		return -ENODEV;
+	} else {
+		if((slave_info->sensor_id == 0x5670)||(slave_info->sensor_id == 0x2355)) {
+			hardwareinfo_set_prop(HARDWARE_FRONT_CAM,sensor_name);
+		}
+		 if ((slave_info->sensor_id == 0x219)||(slave_info->sensor_id == 0x8865)) {
+			hardwareinfo_set_prop(HARDWARE_BACK_CAM,sensor_name);
+		}
 	}
 	return rc;
 }
