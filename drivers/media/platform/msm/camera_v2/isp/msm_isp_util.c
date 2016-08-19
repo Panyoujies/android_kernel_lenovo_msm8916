@@ -182,6 +182,11 @@ int msm_isp_update_bandwidth(enum msm_isp_hw_client client,
 				isp_bandwidth_mgr.client_info[i].ib;
 		}
 	}
+	
+  if(path->vectors[0].ib <6400000000) {   
+        path->vectors[0].ib = 6400000000;    
+  }                                       
+
 	msm_bus_scale_client_update_request(isp_bandwidth_mgr.bus_client,
 		isp_bandwidth_mgr.bus_vector_active_idx);
 	/* Insert into circular buffer */

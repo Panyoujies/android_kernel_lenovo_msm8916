@@ -104,7 +104,7 @@ enum msm_usb_phy_type {
 	SNPS_FEMTO_PHY,
 };
 
-#define IDEV_CHG_MAX	1500
+#define IDEV_CHG_MAX	850   //NewFeature,mahao.wt,ADD,2015.3.16,for 86518_L         
 #define IDEV_CHG_MIN	500
 #define IUNIT		100
 

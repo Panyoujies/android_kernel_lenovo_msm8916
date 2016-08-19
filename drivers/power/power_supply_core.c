@@ -18,6 +18,7 @@
 #include <linux/err.h>
 #include <linux/power_supply.h>
 #include <linux/thermal.h>
+#include <linux/delay.h>
 #include "power_supply.h"
 
 /* exported for the APM Power driver, APM emulation */
@@ -298,6 +299,7 @@ static void power_supply_changed_work(struct work_struct *work)
 		power_supply_update_leds(psy);
 
 		kobject_uevent(&psy->dev->kobj, KOBJ_CHANGE);
+		msleep(100); //james.hong added for improving wake up system speed from QC case 01817960
 		spin_lock_irqsave(&psy->changed_lock, flags);
 	}
 	if (!psy->changed)
@@ -701,10 +703,67 @@ static void psy_unregister_cooler(struct power_supply *psy)
 }
 #endif
 
+//start charging/stop charging
+static ssize_t show_StopCharging_Test(struct device *dev,struct device_attribute *attr, char *buf)
+{
+	/*  Disable charging */
+	bool charging_enable = false;
+	struct power_supply		*batt_psy =NULL;
+	int rc;
+
+	batt_psy = power_supply_get_by_name("battery");
+	if(batt_psy)
+	{	
+		rc = power_supply_set_charging_enabled(batt_psy, 0);
+		if (rc) 
+			pr_err("disable charging failed\n");
+		pr_err("show_StopCharging_Test : %x success\n", charging_enable);
+	}
+	else
+		pr_err("get battery power supply Error!!\n");
+
+    	return sprintf(buf, "chr=%d\n", charging_enable);
+}
+
+static ssize_t store_StopCharging_Test(struct device *dev,struct device_attribute *attr, const char *buf, size_t size)
+{    
+    return -1;
+}
+static DEVICE_ATTR(StopCharging_Test, 0664, show_StopCharging_Test, store_StopCharging_Test);
+
+static ssize_t show_StartCharging_Test(struct device *dev,struct device_attribute *attr, char *buf)
+{
+	/*  Enable charging */
+	bool charging_enable = true;
+	struct power_supply		*batt_psy =NULL;
+	int rc;
+
+	batt_psy = power_supply_get_by_name("battery");
+	if(batt_psy)
+	{	
+		rc = power_supply_set_charging_enabled(batt_psy, 1);
+		if (rc) 
+			pr_err("enable charging failed\n");
+		pr_err("show_StartCharging_Test : %x success\n", charging_enable);
+	}
+	else
+		pr_err("get battery power supply Error!!\n");
+
+    	return sprintf(buf, "chr=%d\n", charging_enable);
+}
+static ssize_t store_StartCharging_Test(struct device *dev,struct device_attribute *attr, const char *buf, size_t size)
+{    
+    return -1;
+}
+static DEVICE_ATTR(StartCharging_Test, 0664, show_StartCharging_Test, store_StartCharging_Test);
+//start charging/stop charging end
+
+
 int power_supply_register(struct device *parent, struct power_supply *psy)
 {
 	struct device *dev;
 	int rc;
+	int ret_device_file=0;
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
@@ -753,6 +812,13 @@ int power_supply_register(struct device *parent, struct power_supply *psy)
 		goto create_triggers_failed;
 
 	power_supply_changed(psy);
+
+	if(strcmp(psy->name, "battery") == 0)
+	{
+		pr_err("battery powe supply creat attr file!!\n");
+		ret_device_file = device_create_file(dev, &dev_attr_StopCharging_Test);//stop charging
+		ret_device_file = device_create_file(dev, &dev_attr_StartCharging_Test);
+	}
 
 	goto success;
 

@@ -204,19 +204,42 @@ static int mdss_fb_notify_update(struct msm_fb_data_type *mfd,
 
 static int lcd_backlight_registered;
 
+/* heming@wingtech.com, 20140731, customize the backlight by wingtech defined, begin */
+#define WINGTECH_MDSS_BRIGHT_TO_BL(out, v, bl_min, bl_max, min_bright, max_bright) do {\
+					if(v <= ((int)min_bright*(int)bl_max-(int)bl_min*(int)max_bright)\
+						/((int)bl_max - (int)bl_min)) out = 1; \
+					else \
+					out = (((int)bl_max - (int)bl_min)*v + \
+					((int)max_bright*(int)bl_min - (int)min_bright*(int)bl_max)) \
+					/((int)max_bright - (int)min_bright); \
+					} while (0)
+/* heming@wingtech.com, 20140731, customize the backlight by wingtech defined, end */
+
 static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 				      enum led_brightness value)
 {
 	struct msm_fb_data_type *mfd = dev_get_drvdata(led_cdev->dev->parent);
-	int bl_lvl;
+	int bl_lvl, brightness_min;
 
+	brightness_min = 10;
+	
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
 	/* This maps android backlight level 0 to 255 into
 	   driver backlight level 0 to bl_max with rounding */
-	MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
+	/* heming@wingtech.com, 20140731, customize the backlight by wingtech defined, begin */
+	#if 1
+		//defualt setting for MMI, 0 ~ 255, Driver: 8 ~ 255
+		if(mfd->panel_info->bl_min == 1)mfd->panel_info->bl_min = 8;//for the case of set bl_min to 1
+		WINGTECH_MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_min, mfd->panel_info->bl_max, 
+		brightness_min, mfd->panel_info->brightness_max);
+		if(bl_lvl && !value)bl_lvl = 0;
+	#else
+		MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
 				mfd->panel_info->brightness_max);
+	#endif
+/* heming@wingtech.com, 20140731, customize the backlight by wingtech defined, end */				
 
 	if (!bl_lvl && value)
 		bl_lvl = 1;
@@ -1074,12 +1097,38 @@ static void mdss_fb_scale_bl(struct msm_fb_data_type *mfd, u32 *bl_lvl)
 	(*bl_lvl) = temp;
 }
 
+//+NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll
+ #ifdef  WT_USE_FAN54015 
+extern bool PwrKeyBoot,ChgrCFGchanged,IsChargingOn;       
+extern int Fan54015Iochg;
+#endif
+//-NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll
+
+
 /* must call this function from within mfd->bl_lock */
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 {
 	struct mdss_panel_data *pdata;
 	u32 temp = bkl_lvl;
 	bool bl_notify_needed = false;
+
+         //+NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll
+        #ifdef  WT_USE_FAN54015        
+           if(PwrKeyBoot==true&&IsChargingOn==true&&(Fan54015Iochg==1150)&&bkl_lvl)        
+             {
+                printk(KERN_WARNING  "~Set BL_ON CHGR Current to 850ma\n");          
+                Fan54015Iochg = 850;
+               ChgrCFGchanged = true;               
+             }
+          else if(PwrKeyBoot==true&&IsChargingOn==true&&(Fan54015Iochg==850)&&(!bkl_lvl))
+                    {
+                         printk(KERN_WARNING  "~Set BL_OFF CHGR Current to 1150ma\n");         
+                         Fan54015Iochg = 1150;
+                        ChgrCFGchanged = true;                  
+                    }
+        #endif
+ //-NewFeature,mahao.wt,ADD,2015.5.21,for PwrKey boot mode BL_ON CHGR current controll      
+        
 
 	/* todo: temporary workaround to support doze mode */
 	if ((bkl_lvl == 0) && (mfd->doze_mode)) {
@@ -1092,6 +1141,12 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) ||
 		mfd->panel_info->cont_splash_enabled) {
 		mfd->unset_bl_level = bkl_lvl;
+          //+OTHER,mahao.wt,ADD,2015.4.7,Screen timeOut Off in powerOff Charging Mode
+               if(bkl_lvl==0)
+                    {  pdata = dev_get_platdata(&mfd->pdev->dev);
+                        pdata->set_backlight(pdata, bkl_lvl);  
+                    }		
+        //-OTHER,mahao.wt,ADD,2015.4.7,Screen timeOut Off in powerOff Charging Mode
 		return;
 	} else {
 		mfd->unset_bl_level = 0;
