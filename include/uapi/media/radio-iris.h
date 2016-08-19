@@ -77,6 +77,8 @@
 #define MAX_SINR_TH 127
 #define MIN_SINR_SAMPLES 0x01
 #define MAX_SINR_SAMPLES 0xFF
+#define MIN_BLEND_HI  -128
+#define MAX_BLEND_HI  127
 
 
 /* ---- HCI Packet structures ---- */
