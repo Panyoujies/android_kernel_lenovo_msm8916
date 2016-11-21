@@ -540,3 +540,4 @@
 	status = "ok";
 };
 
+#include "cyanogenmod-lenovo-wt86518.dtsi"
