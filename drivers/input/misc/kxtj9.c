@@ -28,7 +28,6 @@
 #include <linux/input-polldev.h>
 #include <linux/regulator/consumer.h>
 #include <linux/of.h>
-#include <linux/hardware_info.h>
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
 #include <asm/uaccess.h>
@@ -1141,8 +1140,6 @@ static int kxtj9_probe(struct i2c_client *client,
 		tj9->tj9_wkp_flag = 0;
 		tj9->tj9_task = kthread_run(akm_poll_thread, tj9, "sns_akm");
 	}
-
-	hardwareinfo_set_prop(HARDWARE_ACCELEROMETER,"kxtj2");	
 
 	dev_dbg(&client->dev, "%s: kxtj9_probe OK.\n", __func__);
 	kxtj9_device_power_off(tj9);

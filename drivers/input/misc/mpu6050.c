@@ -31,7 +31,6 @@
 #include <linux/sensors.h>
 #include "mpu6050.h"
 #include <linux/miscdevice.h>
-#include <linux/hardware_info.h>
 #include <linux/uaccess.h>
 #include <asm/uaccess.h>
 #include <linux/kthread.h>
@@ -3783,9 +3782,6 @@ static int mpu6050_probe(struct i2c_client *client,
 	if (ret < 0) {
 		return ret;
 	}
-
-	hardwareinfo_set_prop(HARDWARE_ACCELEROMETER,"mpu6881");	
-	hardwareinfo_set_prop(HARDWARE_GYROSCOPE,"mpu6881");
 
 	ret = mpu6050_power_ctl(sensor, false);
 	if (ret) {

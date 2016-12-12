@@ -35,7 +35,6 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_gpio.h>
 #include <linux/sensors.h>
-#include <linux/hardware_info.h>
 
 #define AKM_DEBUG_IF			0
 #define AKM_HAS_RESET			0
@@ -2636,8 +2635,6 @@ int akm_compass_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	akm_compass_power_set(s_akm, false);
-	
-	hardwareinfo_set_prop(HARDWARE_MAGNETOMETER,"akm09911");
 
 	dev_info(&client->dev, "successfully probed.");
 	return 0;
