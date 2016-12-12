@@ -1,0 +1,24 @@
+# Lenovo configuration options
+
+config MACH_LENOVO
+	bool "LENOVO device"
+	depends on ARCH_MSM
+	help
+	  Support for Lenovo products
+
+config MACH_LENOVO_MSM8916
+	bool "LENOVO MSM8916"
+	depends on ARCH_MSM8916
+	select MACH_LENOVO
+	help
+	  Support for MSM8916 Xiaomi variants
+
+menu "Lenovo board selection"
+
+	config MACH_LENOVO_WT86518
+		bool "LENOVO_WT86518 board"
+		select MACH_LENOVO_MSM8916
+		help
+		  Support for Lenovo K30-T/A6000 variant
+
+endmenu
