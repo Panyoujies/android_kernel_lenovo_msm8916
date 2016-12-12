@@ -207,20 +207,21 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			qcom,vddmax-mv = <4200>;
-			qcom,vddsafe-mv = <4200>;
-			qcom,vinmin-mv = <4308>;
+			qcom,vddmax-mv = <4350>;
+			qcom,vddsafe-mv = <4350>;
+			qcom,vinmin-mv = <4470>;
 			qcom,ibatsafe-ma = <1440>;
-			qcom,thermal-mitigation = <1440 720 630 0>;
-			qcom,cool-bat-decidegc = <100>;
+			qcom,thermal-mitigation = <1440 720 540 0>;//NewFeature,mahao.wt,MODIFY,2015.3.20,For S86528  JEITA  Config
+			qcom,cool-bat-decidegc = <150>;
 			qcom,warm-bat-decidegc = <450>;
-			qcom,cool-bat-mv = <4100>;
-			qcom,warm-bat-mv = <4100>;
-			qcom,ibatmax-warm-ma = <360>;
-			qcom,ibatmax-cool-ma = <360>;
-			qcom,batt-hot-percentage = <25>;
-			qcom,batt-cold-percentage = <80>;
-			qcom,tchg-mins = <232>;
+			qcom,cool-bat-mv = <4350>;//NewFeature,mahao.wt,MODIFY,2015.3.20,For S86528  JEITA  Config
+			qcom,warm-bat-mv = <4200>;
+			qcom,ibatmax-warm-ma = <720>;
+			qcom,ibatmax-cool-ma = <540>;
+			qcom,batt-hot-percentage = <35>;
+			qcom,batt-cold-percentage = <70>;
+			qcom,tchg-mins = <360>;
+			qcom,resume-soc = <99>;
 			qcom,chg-vadc = <&pm8916_vadc>;
 			qcom,chg-adc_tm = <&pm8916_adc_tm>;
 
@@ -269,9 +270,9 @@
 			status = "disabled";
 
 			qcom,v-cutoff-uv = <3400000>;
-			qcom,max-voltage-uv = <4200000>;
+			qcom,max-voltage-uv = <4350000>;           
 			qcom,r-conn-mohm = <0>;
-			qcom,shutdown-soc-valid-limit = <100>;
+			qcom,shutdown-soc-valid-limit = <10>; //BUG,mahao.wt,MODIFY,2015.5.26,For batt capacity mutation in Restart-up
 			qcom,low-soc-calculate-soc-threshold = <15>;
 			qcom,low-voltage-calculate-soc-ms = <1000>;
 			qcom,low-soc-calculate-soc-ms = <5000>;
@@ -288,7 +289,8 @@
 			qcom,force-s3-on-suspend;
 			qcom,force-s2-in-charging;
 			qcom,report-charger-eoc;
-			qcom,resume-soc = <99>;
+
+			qcom,resume-soc = <99>; //NewFeature,mahao.wt,MODIFY,2015.3.20,For S86528  JEITA  Config             
 
 			qcom,batt-pres-status@1208 {
 				reg = <0x1208 0x1>;
@@ -548,7 +550,7 @@
 			compatible = "qcom,qpnp-vibrator";
 			reg = <0xc000 0x100>;
 			label = "vibrator";
-			status = "disabled";
+			status = "okay";
 		};
 
 		pm8916_tombak_dig: msm8x16_wcd_codec@f000{
