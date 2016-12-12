@@ -123,6 +123,9 @@
 
 #define QPNP_VM_BMS_DEV_NAME		"qcom,qpnp-vm-bms"
 
+
+#define SW_FG_DEBUG   //add by maxwill for test
+
 /* indicates the state of BMS */
 enum {
 	IDLE_STATE,
@@ -283,6 +286,16 @@ struct qpnp_bms_chip {
 };
 
 static struct qpnp_bms_chip *the_chip;
+
+
+//+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+#if defined (WT_USE_FAN54015)
+extern bool  InSOCrecharge,BattFull,TrunOnChg;     
+extern int fan_54015_batt_current,fan_54015_batt_ocv;
+extern int fan54015_getcharge_stat(void);
+#endif
+//-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+
 
 static struct temp_curr_comp_map temp_curr_comp_lut[] = {
 			{-300, 15},
@@ -502,7 +515,7 @@ static bool is_battery_charging(struct qpnp_bms_chip *chip)
 	if (chip->batt_psy) {
 		/* if battery has been registered, use the type property */
 		chip->batt_psy->get_property(chip->batt_psy,
-					POWER_SUPPLY_PROP_CHARGE_TYPE, &ret);
+					POWER_SUPPLY_PROP_CHARGE_TYPE, &ret);    
 		return ret.intval != POWER_SUPPLY_CHARGE_TYPE_NONE;
 	}
 
@@ -1176,6 +1189,10 @@ static int read_and_update_ocv(struct qpnp_bms_chip *chip, int batt_temp,
 	pr_debug("ocv_raw=0x%x last_ocv_raw=0x%x last_ocv_uv=%d\n",
 		ocv_data, chip->last_ocv_raw, chip->last_ocv_uv);
 
+	#ifdef SW_FG_DEBUG
+               printk(KERN_WARNING  "~init_Vbat_ocv_original=%d\n", chip->last_ocv_uv);
+	#endif
+
 	return 0;
 }
 
@@ -1199,6 +1216,25 @@ static int get_battery_voltage(struct qpnp_bms_chip *chip, int *result_uv)
 
 static int get_battery_status(struct qpnp_bms_chip *chip)
 {
+    //+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+       #if defined (WT_USE_FAN54015)
+            int chg_status=0; 
+
+	     chg_status = fan54015_getcharge_stat();
+	  
+	    if(chg_status<0)
+		{  pr_err("Failed to read Fan54015 status! \n");
+                   return POWER_SUPPLY_STATUS_UNKNOWN;
+	    	}
+	   else  if(chg_status==0x01)
+	   	        {  
+	                     printk(KERN_WARNING  "~ status3 \n");       
+	   	             return POWER_SUPPLY_STATUS_CHARGING;
+	   	        }	
+	   return POWER_SUPPLY_STATUS_DISCHARGING;
+      #else
+   //-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+
 	union power_supply_propval ret = {0,};
 
 	if (chip->batt_psy == NULL)
@@ -1213,6 +1249,7 @@ static int get_battery_status(struct qpnp_bms_chip *chip)
 	/* Default to false if the battery power supply is not registered. */
 	pr_debug("battery power supply is not registered\n");
 	return POWER_SUPPLY_STATUS_UNKNOWN;
+     #endif   //NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver	
 }
 
 static int get_batt_therm(struct qpnp_bms_chip *chip, int *batt_temp)
@@ -1413,11 +1450,19 @@ static int report_eoc(struct qpnp_bms_chip *chip)
 		chip->batt_psy = power_supply_get_by_name("battery");
 	if (chip->batt_psy) {
 		rc = chip->batt_psy->get_property(chip->batt_psy,
-				POWER_SUPPLY_PROP_STATUS, &ret);
+				POWER_SUPPLY_PROP_STATUS, &ret);		
+     	
 		if (rc) {
 			pr_err("Unable to get battery 'STATUS' rc=%d\n", rc);
 		} else if (ret.intval != POWER_SUPPLY_STATUS_FULL) {
 			pr_debug("Report EOC to charger\n");
+		       //+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+                       #if defined (WT_USE_FAN54015)
+                             InSOCrecharge = false;   
+		            BattFull = true;
+			    printk(KERN_WARNING  "~ 1.BAT Full,TurnOff CHGR  \n"); 
+                      #endif
+                      //-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
 			ret.intval = POWER_SUPPLY_STATUS_FULL;
 			rc = chip->batt_psy->set_property(chip->batt_psy,
 					POWER_SUPPLY_PROP_STATUS, &ret);
@@ -1427,6 +1472,18 @@ static int report_eoc(struct qpnp_bms_chip *chip)
 			}
 			chip->eoc_reported = true;
 		}
+	 //+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+           #if defined (WT_USE_FAN54015)
+               else if((ret.intval == POWER_SUPPLY_STATUS_FULL)&&(fan_54015_batt_current<0&&fan_54015_batt_current>-100000&&fan_54015_batt_ocv>4350000))
+               	{
+                      InSOCrecharge = false;   
+		      BattFull = true;
+		      printk(KERN_WARNING  "~ 2.BAT Full,TurnOff CHGR  \n");           
+                     TrunOnChg = false;
+               	}
+          #endif
+         //-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+		
 	} else {
 		pr_err("battery psy not registered\n");
 	}
@@ -1450,6 +1507,13 @@ static void check_recharge_condition(struct qpnp_bms_chip *chip)
 
 	/* Report recharge to charger for SOC based resume of charging */
 	if ((status != POWER_SUPPLY_STATUS_CHARGING) && chip->eoc_reported) {
+               //+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+                #if defined (WT_USE_FAN54015)
+                      InSOCrecharge = true;      
+		     BattFull= false;
+               #endif
+             //-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+		
 		ret.intval = POWER_SUPPLY_STATUS_CHARGING;
 		rc = chip->batt_psy->set_property(chip->batt_psy,
 				POWER_SUPPLY_PROP_STATUS, &ret);
@@ -1601,6 +1665,18 @@ static int report_vm_bms_soc(struct qpnp_bms_chip *chip)
 
 	charging = is_battery_charging(chip);
 
+
+     //+NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver
+         #if defined (WT_USE_FAN54015)		
+           rc = fan54015_getcharge_stat();
+	   if(rc==0x1)
+	   	charging = true;
+	   else
+	   	charging = false;
+	   // printk(KERN_WARNING  "~ charging=%d last_soc=%d last_soc_unbound=%d soc=%d \n",charging, chip->last_soc, chip->last_soc_unbound,soc);//add by maxwill
+        #endif
+    //-NewFeature,mahao.wt,ADD,2015.3.16,add Fan54015 driver	
+
 	pr_debug("charging=%d last_soc=%d last_soc_unbound=%d\n",
 		charging, chip->last_soc, chip->last_soc_unbound);
 	/*
@@ -1699,6 +1775,19 @@ static int report_vm_bms_soc(struct qpnp_bms_chip *chip)
 	 * during bootup if soc is 100:
 	 */
 	soc = bound_soc(soc);
+
+        #if defined (WT_USE_FAN54015)
+              if(soc==100&&charging)        
+              	{  if(fan_54015_batt_current<0&&fan_54015_batt_current>-100000&&fan_54015_batt_ocv>4350000)
+                       soc = 100;
+	           else if(fan_54015_batt_current<-100000)     
+			     {
+                                 soc -= 1;   
+
+	           	     }
+              	}
+        #endif
+	
 	if ((soc != chip->last_soc) || (soc == 100)) {
 		chip->last_soc = soc;
 		check_eoc_condition(chip);
@@ -2300,6 +2389,9 @@ static int qpnp_vm_bms_power_get_property(struct power_supply *psy,
 	return 0;
 }
 
+#if defined (WT_USE_FAN54015)
+extern int fan_54015_batt_current,fan_54015_batt_ocv;
+#endif
 static int qpnp_vm_bms_power_set_property(struct power_supply *psy,
 					enum power_supply_property psp,
 					const union power_supply_propval *val)
@@ -2311,11 +2403,17 @@ static int qpnp_vm_bms_power_set_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		chip->current_now = val->intval;
+                #if defined (WT_USE_FAN54015)
+                fan_54015_batt_current= val->intval;
+                #endif
 		pr_debug("IBATT = %d\n", val->intval);
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
 		cancel_delayed_work_sync(&chip->monitor_soc_work);
 		chip->last_ocv_uv = val->intval;
+                #if defined (WT_USE_FAN54015)
+                fan_54015_batt_ocv = val->intval;
+                #endif
 		pr_debug("OCV = %d\n", val->intval);
 		schedule_delayed_work(&chip->monitor_soc_work, 0);
 		break;
@@ -2803,6 +2901,10 @@ static int read_shutdown_ocv_soc(struct qpnp_bms_chip *chip)
 	pr_debug("shutdown_ocv=%d shutdown_soc=%d\n",
 			chip->shutdown_ocv, chip->shutdown_soc);
 
+	#ifdef SW_FG_DEBUG
+               printk(KERN_WARNING  "~SD_soc=%d\n", chip->shutdown_soc);
+	#endif
+
 	return 0;
 }
 
@@ -2867,6 +2969,9 @@ static int calculate_initial_soc(struct qpnp_bms_chip *chip)
 {
 	int rc, batt_temp = 0, est_ocv = 0;
 
+	#if defined (WT_USE_FAN54015)
+	   u16  Vbat_ocv=0;  
+       #endif
 	rc = get_batt_therm(chip, &batt_temp);
 	if (rc < 0) {
 		pr_err("Unable to read batt temp, using default=%d\n",
@@ -2902,11 +3007,30 @@ static int calculate_initial_soc(struct qpnp_bms_chip *chip)
 			chip->calculated_soc = lookup_soc_ocv(chip, est_ocv,
 								batt_temp);
 		} else {
+              #if defined (WT_USE_FAN54015)
+                rc = qpnp_read_wrapper(chip, (u8 *)&Vbat_ocv,
+				chip->base + 0xB8, 2);
+	        if (rc) 
+		       pr_err("~Read Vbat_ocv Failed! rc = %d\n", rc); 	
+		else
+			pr_info("~ Vbat_ocv = %d\n", Vbat_ocv); 	
+                chip->last_ocv_uv = Vbat_ocv*1000;
+   		
+                  chip->calculated_soc = lookup_soc_ocv(chip,chip->last_ocv_uv, batt_temp);
+			
+                           if(!chip->shutdown_soc_invalid &&
+			(abs(chip->shutdown_soc - chip->calculated_soc) <
+				chip->dt.cfg_shutdown_soc_valid_limit))
+                      {
+             #endif         
 			chip->last_ocv_uv = chip->shutdown_ocv;
 			chip->last_soc = chip->shutdown_soc;
 			chip->calculated_soc = lookup_soc_ocv(chip,
 						chip->shutdown_ocv, batt_temp);
 			pr_debug("Using shutdown SOC\n");
+                #if defined (WT_USE_FAN54015)		
+                      }
+	        #endif         
 		}
 	} else {
 		/*
@@ -2917,9 +3041,23 @@ static int calculate_initial_soc(struct qpnp_bms_chip *chip)
 		if (chip->workaround_flag & WRKARND_PON_OCV_COMP)
 			adjust_pon_ocv(chip, batt_temp);
 
+             #if defined (WT_USE_FAN54015)
+                rc = qpnp_read_wrapper(chip, (u8 *)&Vbat_ocv,
+				chip->base + 0xB8, 2);
+	        if (rc) 
+		       pr_err("~Read Vbat_ocv Failed! rc = %d\n", rc); 	
+		else
+			pr_info("\n~ Vbat_ocv = %d\n", Vbat_ocv); 	
+                chip->last_ocv_uv = Vbat_ocv*1000;
+	     #endif			
 		 /* !warm_reset use PON OCV only if shutdown SOC is invalid */
 		chip->calculated_soc = lookup_soc_ocv(chip,
 					chip->last_ocv_uv, batt_temp);
+
+               #ifdef SW_FG_DEBUG
+                      printk(KERN_WARNING  "~init_calcu_soc=%d\n", chip->calculated_soc);
+	       #endif             
+		 
 		if (!chip->shutdown_soc_invalid &&
 			(abs(chip->shutdown_soc - chip->calculated_soc) <
 				chip->dt.cfg_shutdown_soc_valid_limit)) {

@@ -430,6 +430,7 @@ struct smb1360_chip {
 	u32				fg_peek_poke_address;
 	int				skip_writes;
 	int				skip_reads;
+    int                             chg_voltage; //+New features, libin.wt,add code , 2015-04-21 ,charger over-voltage pop-up prompts.
 	struct dentry			*debug_root;
 
 	struct qpnp_vadc_chip		*vadc_dev;
@@ -1212,6 +1213,8 @@ static int smb1360_get_prop_batt_health(struct smb1360_chip *chip)
 		ret.intval = POWER_SUPPLY_HEALTH_WARM;
 	else if (chip->batt_cool)
 		ret.intval = POWER_SUPPLY_HEALTH_COOL;
+	else if (chip->chg_voltage == POWER_SUPPLY_HEALTH_OVERVOLTAGE) //+New features, libin.wt,add code , 2015-04-21 ,charger over-voltage pop-up prompts.
+		ret.intval = POWER_SUPPLY_HEALTH_OVERVOLTAGE;//+New features, libin.wt,add code , 2015-04-21 ,charger over-voltage pop-up prompts.
 	else
 		ret.intval = POWER_SUPPLY_HEALTH_GOOD;
 
@@ -2315,7 +2318,27 @@ static int usbin_uv_handler(struct smb1360_chip *chip, u8 rt_stat)
 
 	return 0;
 }
+//+New features, libin.wt,add code , 2015-04-21 ,charger over-voltage pop-up prompts.
+static int usbin_ov_handler(struct smb1360_chip *chip, u8 rt_stat)
+{
+	/*
+	 * rt_stat indicates if usb is overvolted. If so usb_present
+	 * should be marked removed
+	 */
+	bool usb_present = !rt_stat;
 
+	pr_debug("jeft chip->usb_present = %d usb_present = %d\n",
+			chip->usb_present, usb_present);
+
+	if (chip->usb_psy) {
+		chip->chg_voltage = rt_stat ? POWER_SUPPLY_HEALTH_OVERVOLTAGE
+					: POWER_SUPPLY_HEALTH_GOOD;
+		power_supply_set_health_state(chip->usb_psy, chip->chg_voltage);
+	}
+
+	return 0;
+}
+ //-New features, libin.wt,add code , 2015-04-21 ,charger over-voltage pop-up prompts.	
 static int aicl_done_handler(struct smb1360_chip *chip, u8 rt_stat)
 {
 	bool aicl_done = !!rt_stat;
@@ -2676,6 +2699,7 @@ static struct irq_handler_info handlers[] = {
 			},
 			{
 				.name		= "usbin_ov",
+                .smb_irq	= usbin_ov_handler, //+New features, libin.wt,add code , 2015-04-21 ,charger over-voltage pop-up prompts.
 			},
 			{
 				.name		= "unused",
